@@ -60,6 +60,7 @@ int nestingLevel = 1;
 int difficultyLevel = 1;
 int tileLength = 2; 
 int scrollCount = 0;
+int increment = 0;
 
 
 bool matrix[matrixSize][matrixSize] = {
@@ -111,6 +112,7 @@ void setup() {
 
   lcd.begin(16, 2); // Print a message to the LCD.
   Serial.begin(9600);
+  randomSeed(analogRead(dinPin));
 
 }
 
@@ -368,7 +370,7 @@ void scrollDownMatrix() {
   randomTilePosition = random(0, 5);
   for (int col = 0; col < matrixSize; col++) {
 
-    if (cnt % 3 == 0) {
+    if (cnt % 3 == 1) {
       //rand pe care pun tile
       if (col >= randomTilePosition && col <= randomTilePosition + tileLength) {
         matrix[0][col] = 1; // randul de sus(este generat mereu aleatoriu)
@@ -405,20 +407,24 @@ void detectTileCollision() {
   if (matrix[xPos + 1][yPos] == 1 && matrix[xPos][yPos] == 1) {
     //we are on a tile, jump 3 units
     jumpCount = 3; //how far we jump
-    previousTilePosition = currentTilePosition;
+    previousTilePosition = currentTilePosition + increment;
     currentTilePosition = xPos + 1;
-    detectCounter++;
 
-    //Serial.println(detectCounter);
+    Serial.println(currentTilePosition);
 
     //we only move forward if we find a tile that s higher than the tile we came from
+    //nu intra pe urmatoru if cand sunt platformele prea apropiate/una peste alta
     if (previousTilePosition > currentTilePosition) {
       score += 1;
       tileDifference = previousTilePosition - currentTilePosition;
-      scrollAmount = scrollAmount + tileDifference;
+      scrollAmount = tileDifference;
+      increment = scrollAmount;
       //Serial.println(tileDifference);
-
     }
+    else{
+      increment = 0;
+    }
+    
     //Serial.println(scrollAmount);
   }
   //else, start going down
@@ -453,13 +459,14 @@ void updatePositions() {
   
   */
   detectTileCollision();
-  // s-a terminat saritura(x a fost decrementat de 3 ori
+  // s-a terminat saritura(x a fost decrementat de 3 ori)
   if (jumpCount == 0) {
     // Serial.println("aici");
     //scroll = false;
     jumping = 0;
     jumpCount--; // nu neaparat necesara linia asta
-  } else if (jumpCount > 0) {
+  } 
+  else if (jumpCount > 0) {
     jumping = 1;
     xPos--;
     jumpCount--;
@@ -487,6 +494,7 @@ void updatePositions() {
       yPos = matrixSize - 1;
     }
   }
+  
   // daca macar una dintre coordonate e diferita 
   // fata de configuratia precedenta, inseamna
   // ca s a produs o modificare, deci trebuie
@@ -501,17 +509,21 @@ void updatePositions() {
     //game over
     if (xPos > 6) {
       xPos = 100;
-      delay(150);
+      
       //function to print a death Matrix
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Your score:");
+      lcd.setCursor(0,1);
+      //lcd.print(score);
+      
 
       for (int row = 0; row < matrixSize; row++) {
         for (int col = 0; col < matrixSize; col++) {
           matrix[row][col] = loserMatrix[row][col];
         }
       }
+      
       //  lcd.print(score);
     } else {
       matrixChanged = true;
