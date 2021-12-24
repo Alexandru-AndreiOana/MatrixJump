@@ -1,5 +1,7 @@
 #include "LedControl.h" //  need the library
 #include<LiquidCrystal.h>
+#include <EEPROM.h>
+const int buzzerPin = 13;
 const int dinPin = 12;
 const int clockPin = 11;
 const int loadPin = 10;
@@ -14,9 +16,23 @@ const int d5 = 6;
 const int d6 = 5;
 const int d7 = 4;
 
+const int topScoreAddress = 0;
+const int secondScoreAddress = 1;
+const int thirdScoreAddress = 2;
+
+const int topScorerAddress = 3;
+const int secondScorerAddress = 4;
+const int thirdScorerAddress = 5;
+
+const int buzzerTone = 450;
+
 LedControl lc = LedControl(dinPin, clockPin, loadPin, 1); //DIN, CLK, LOAD, No.DRIVER
 LiquidCrystal lcd(rsPin, enablePin, d4, d5, d6, d7);
 
+bool inputUsername = 0;
+int tileCount = 0;
+int startTime = 0;
+int blinkDelay = 50;
 byte matrixBrightness = 10;
 byte xPos = 6;
 byte yPos = 5;
@@ -37,12 +53,12 @@ bool joyMoved = false; //continuous button pushing not allowed
 bool buttonPressed = false;
 const byte debounceInterval = 100;
 int score = 0;
-String topScorer = "ALX";
-String topScorer2 = "MEH";
-String topScorer3 = "BAD";
-int highestScore = 0;
-int highestScore2 = 0;
-int highestScore3 = 0;
+String topScorer = "N/A"; 
+String secondScorer = "N/A";
+String thirdScorer = "N/A"; 
+int topScore =  EEPROM.read(topScoreAddress);
+int secondScore = EEPROM.read(secondScoreAddress);
+int thirdScore = EEPROM.read(thirdScoreAddress);
 int settingsState = 1; 
 int jumpCount = 0;
 int initialJump = 2;
@@ -61,9 +77,15 @@ int difficultyLevel = 1;
 int tileLength = 2; 
 int scrollCount = 0;
 int increment = 0;
+int randomFaultyTile;
+int previousFaultyTile = 0;
+String username = "AAA";
+int activeLetter = 0;
+int ranking = 0;
+int randomTileLength;
 
 
-bool matrix[matrixSize][matrixSize] = {
+int matrix[matrixSize][matrixSize] = {
   {0,0,0,0,0,0,0,0},
   {0,0,0,0,0,1,1,1},
   {0,0,0,0,0,0,0,0},
@@ -99,7 +121,7 @@ bool loserMatrix[matrixSize][matrixSize] = {
 };
 */
 void setup() {
-
+  pinMode(buzzerPin, OUTPUT);
   pinMode(swPin, INPUT_PULLUP);
   // inverts behaviour of INPUT mode (high = off, low = on)
   // button presses will be handled with interrupts
@@ -113,10 +135,35 @@ void setup() {
   lcd.begin(16, 2); // Print a message to the LCD.
   Serial.begin(9600);
   randomSeed(analogRead(dinPin));
+  randomSeed(analogRead(clockPin));
+  randomSeed(analogRead(loadPin));
 
+  /*EEPROM.get(topScorerAddress, topScorer);
+  EEPROM.get(secondScorerAddress, secondScorer);
+  EEPROM.get(thirdScorerAddress, thirdScorer);
+  if(topScorer > "ZZZ" || topScorer < "AAA"){
+    topScorer = "N/A"; 
+    //Serial.println("yes");
+  }
+  if(secondScorer > "ZZZ" || secondScorer < "AAA"){
+    secondScorer = "N/A";
+    Serial.println("yes");
+  }
+  if(thirdScorer > "ZZZ" || thirdScorer < "AAA"){
+    thirdScorer = "N/A";
+  }
+  EEPROM.put(topScorerAddress, topScorer);
+  EEPROM.put(secondScorerAddress, secondScorer);
+  EEPROM.put(thirdScorerAddress, thirdScorer);
+
+  Serial.println(topScorer);
+  //Serial.println(secondScorer);
+  Serial.println(thirdScorer);
+  */
 }
 
 void loop() {
+  
   //the menu routine
   if (startGame == 0) {
 
@@ -128,12 +175,50 @@ void loop() {
       switch (menuState) {
         //menu tab (can only go left and right)
       case 1:
+        lcd.clear();
         lcd.setCursor(0, 0);
         lcd.print("->PLAY GAME");
         lcd.setCursor(0, 1);
         lcd.print("HIGHSCORE");
         //enter the game state
+
+        
         if (buttonPressed == true) {
+
+          
+          //refresh previous data
+          for (int row = 0; row < matrixSize; row++) {
+            for (int col = 0; col < matrixSize; col++) {
+              if((row == 1 && col >=5 && col <= 7) || (row == 4 && col >=1 && col <= 3) || (row == 7 && col >= 5 && col <=7 )){
+                matrix[row][col] = 1;
+          }
+              else{
+                matrix[row][col] = 0;
+          }
+        }
+      }
+        //refresh score
+          score = 0;
+
+        //refresh dot positioning
+          xPos = 3;
+          yPos = 6;
+
+        //refresh variables
+        xLastPos = 0;
+        yLastPos = 0;
+        jumpCount = 0;
+        jumping = 0;
+        scroll = false;
+        scrollAmount = 0;
+        currentTilePosition = 7;
+        previousTilePosition = 7;
+        increment = 0;
+        previousFaultyTile = 0;
+        lastMoved = 0;
+        ranking = 0;
+        tileCount = 0;
+          
           startGame = 1;
           lcd.clear();
           lcd.setCursor(0, 0);
@@ -171,23 +256,23 @@ void loop() {
           lcd.setCursor(1, 0);
           lcd.print(topScorer);
           lcd.setCursor(0, 1);
-          lcd.print(highestScore);
+          lcd.print(EEPROM.read(topScoreAddress));
 
           // 2nd highest scorer
           lcd.setCursor(6, 0);
           lcd.print("2");
           lcd.setCursor(7, 0);
-          lcd.print(topScorer2);
+          lcd.print(secondScorer);
           lcd.setCursor(6, 1);
-          lcd.print(highestScore2);
+          lcd.print(EEPROM.read(secondScoreAddress));
 
           // 3rd highest scorer
           lcd.setCursor(12, 0);
           lcd.print("3");
           lcd.setCursor(13, 0);
-          lcd.print(topScorer3);
+          lcd.print(thirdScorer);
           lcd.setCursor(12, 1);
-          lcd.print(highestScore3);
+          lcd.print(EEPROM.read(thirdScoreAddress));
         }
 
         if (xValue < minThreshold && joyMoved == false && buttonPressed == false) {
@@ -267,6 +352,19 @@ void loop() {
                 lcd.clear();
                 lcd.setCursor(0, 0);
                 lcd.print("->OVERKILL");
+                lcd.setCursor(0, 1);
+                lcd.print("SPEEDRUN (ALPHA)");
+                //choose the hard difficulty
+                if (xValue > maxThreshold && joyMoved == false) {
+                  difficultyLevel = 3;
+                  tileLength = 1;
+                  joyMoved = true;
+                }
+              }
+              else if (difficultyLevel == 3){
+                lcd.clear();
+                lcd.setCursor(0, 0);
+                lcd.print("->SPEEDRUN (ALPHA)");
                 lcd.setCursor(0, 1);
                 lcd.print("EASY (DEFAULT)");
                 //choose the easy difficulty
@@ -351,7 +449,7 @@ void loop() {
 
     // matrix display logic
     updateMatrix();
-    matrixChanged = false;
+    //matrixChanged = false;
 
   }
 
@@ -367,19 +465,56 @@ void scrollDownMatrix() {
       matrix[row][col] = matrix[row - 1][col];
     }
   }
-  randomTilePosition = random(0, 5);
+  randomTilePosition = random(0, 6);
+  randomFaultyTile = random(0,6); //decid daca randul de sus va avea un faulty tile sau nu
+  if(score > 50){
+    if(difficultyLevel == 1){
+      tileLength = random(1,3);
+    }
+    else if(difficultyLevel == 2 || difficultyLevel == 3){
+      randomTileLength = random(0,7);
+      if(randomTileLength > 1){
+        tileLength = 1;
+      }
+      else{
+        tileLength = 0;
+      }
+      //tileLength = random(0,2);
+    }
+  }
+  //Serial.println(randomFaultyTile);
   for (int col = 0; col < matrixSize; col++) {
 
-    if (cnt % 3 == 1) {
+    if (cnt % 2 == 0) {
       //rand pe care pun tile
-      if (col >= randomTilePosition && col <= randomTilePosition + tileLength) {
+      
+      if(randomFaultyTile == 1 && previousFaultyTile ==0 && (difficultyLevel == 2 || difficultyLevel == 3)) {
+       
+       if (col >= randomTilePosition && col <= randomTilePosition + tileLength){
+         matrix[0][col] = 2;  //marchez tile urile faulty
+         if(col == randomTilePosition + tileLength){
+          previousFaultyTile = 1;
+         }
+         Serial.println("yes");
+       }
+        else {
+        matrix[0][col] = 0;
+      }
+    }
+      
+      else if (col >= randomTilePosition && col <= randomTilePosition + tileLength) {
         matrix[0][col] = 1; // randul de sus(este generat mereu aleatoriu)
+         if(col == randomTilePosition + tileLength){
+          previousFaultyTile = 0;
+         }
       } else {
         matrix[0][col] = 0;
       }
 
-    } else {
-      matrix[0][col] = 0;
+    } 
+    //daca nu pun un tile, ramane gol
+    else {
+      matrix[0][col] = 0; //no tiles on this row
     }
   }
   cnt += 1;
@@ -406,20 +541,39 @@ void detectTileCollision() {
   //if there is a tile underneath our dot, we jump
   if (matrix[xPos + 1][yPos] == 1 && matrix[xPos][yPos] == 1) {
     //we are on a tile, jump 3 units
-    jumpCount = 3; //how far we jump
+    tone(buzzerPin, buzzerTone, 20);
+    if(difficultyLevel == 2 || difficultyLevel == 3){
+      jumpCount = 4; //how far we jump
+    }
+    else{
+      jumpCount = 3; //for the 1st level
+    }
     previousTilePosition = currentTilePosition + increment;
     currentTilePosition = xPos + 1;
 
-    Serial.println(currentTilePosition);
+  //  Serial.println(currentTilePosition);
 
     //we only move forward if we find a tile that s higher than the tile we came from
-    //nu intra pe urmatoru if cand sunt platformele prea apropiate/una peste alta
     if (previousTilePosition > currentTilePosition) {
       score += 1;
       tileDifference = previousTilePosition - currentTilePosition;
       scrollAmount = tileDifference;
       increment = scrollAmount;
       //Serial.println(tileDifference);
+    }
+    else if(difficultyLevel == 3 && previousTilePosition == currentTilePosition){
+      tileCount ++;
+      if(tileCount > 1){
+         increment = 0;
+         xPos = 20;
+         for (int i = 0; i < matrixSize; i++)
+         for (int j = 0; j <matrixSize; j++){
+           if (i == xPos + 1){
+             matrix [i][j] = 0;
+           }
+         }
+      }
+     
     }
     else{
       increment = 0;
@@ -436,12 +590,31 @@ void detectTileCollision() {
 }
 
 void updateMatrix() {
+int timeNow = millis();
+bool value = 0;
+for (int row = 0; row < matrixSize; row++) {
+for (int col = 0; col < matrixSize; col++) {
 
-  for (int row = 0; row < matrixSize; row++) {
-    for (int col = 0; col < matrixSize; col++) {
-      lc.setLed(0, row, col, matrix[row][col]);
+   if(timeNow - startTime > blinkDelay){
+    if(value == 0){
+      value = 1;
     }
-  }
+    else{
+      value = 0;
+    }
+    startTime = timeNow;
+    //Serial.println("value");
+   }
+    if(matrix[row][col] == 2){
+    Serial.println("faultyTile");
+    lc.setLed(0, row, col, value);
+}
+  
+    else{
+      lc.setLed(0,row, col, matrix[row][col]);
+    }
+}
+}
 }
 
 void updatePositions() {
@@ -503,29 +676,190 @@ void updatePositions() {
   if (xPos != xLastPos || yPos != yLastPos) {
     if (difficultyLevel == 1) {
       delay(150);
-    } else if (difficultyLevel == 2) {
+    } else if (difficultyLevel == 2 || difficultyLevel == 3) {
       delay(120);
     }
     //game over
     if (xPos > 6) {
+      tone(buzzerPin, 50, 1000);
+
       xPos = 100;
+      if (inputUsername == 0){
+
+        activeLetter = 0;
+        
+        if (score >= thirdScore){
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("Congratulations!");
+          
+        
+          if (score >= topScore){
+            thirdScore = secondScore;
+            secondScore = topScore;
+            topScore = score;
+            ranking = 1;
+    
+            lcd.setCursor(0,1);
+            lcd.print("You are 1st!");
+  
+            EEPROM.update(topScoreAddress, topScore);
+            EEPROM.update(secondScoreAddress, secondScore);
+            EEPROM.update(thirdScoreAddress, thirdScore);
+            
+          }
+    
+           
+          else if (score >= secondScore){
+            thirdScore = secondScore;
+            secondScore = score;
+            ranking = 2;
+            lcd.setCursor(0,1);
+            lcd.print("You are 2nd!");
+  
+            EEPROM.update(secondScoreAddress, secondScore);
+            EEPROM.update(thirdScoreAddress, thirdScore);
+          }
+          else {
+            thirdScore = score;
+            ranking = 3;
+            lcd.setCursor(0,1);
+            lcd.print("You are 3rd!");
+  
+            EEPROM.update(thirdScoreAddress, thirdScore);
+          }
+          delay(4000);
+           //ask for name input 
+  
+          
+        
+        }
       
-      //function to print a death Matrix
+    
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Your score:");
       lcd.setCursor(0,1);
-      //lcd.print(score);
+      lcd.print(score);
+      delay(3000);
+      if(ranking == 1 || ranking == 2 || ranking == 3){
+        inputUsername = 1;
+      }
+      else{
+        lcd.clear();
+        lcd.setCursor(3,0);
+        lcd.print("Better luck");
+        lcd.setCursor(3,1);
+        lcd.print("next time!");
+        delay(3000);
+      }
+      }
       
+      buttonPressed = true;
+      //prompt user to input their username
+      while(inputUsername == 1){
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Input username:");
+        lcd.setCursor(0,1);
+        lcd.print(username);
 
+
+          int yValue = analogRead(yPin);
+          int xValue = analogRead(xPin);
+
+          if(yValue <= minThreshold){
+            if(activeLetter > 0){
+            activeLetter--;
+            
+          }
+          else if (activeLetter == 0){
+            activeLetter = 2;
+          }
+        }
+
+          else if (yValue >= maxThreshold){
+           if(activeLetter < 2){
+            activeLetter ++;
+            
+          }
+          else if (activeLetter == 2){
+            activeLetter = 0; 
+          }
+         }
+          
+          
+          
+          if(xValue <= minThreshold){
+            if(username[activeLetter] <'Z'){
+            username[activeLetter] ++;
+            
+          }
+          else if (username[activeLetter] == 'Z'){
+            username[activeLetter] = 'A'; 
+          }
+        }
+         else if (xValue >= maxThreshold){
+           if(username[activeLetter] >'A'){
+            username[activeLetter] --;
+            
+          }
+          else if (username[activeLetter] == 'A'){
+            username[activeLetter] = 'Z'; 
+          }
+         }
+
+         if(buttonPressed == false){
+          inputUsername = 0;
+         }
+          delay(200);
+      }
+     
+      
+      
       for (int row = 0; row < matrixSize; row++) {
         for (int col = 0; col < matrixSize; col++) {
           matrix[row][col] = loserMatrix[row][col];
+      
         }
       }
+
+      if(ranking == 1){
+        topScorer = username;
+        
+      }
+      else if(ranking == 2){
+        secondScorer = username;
+        
+      }
+      else if (ranking == 3){
+        thirdScorer = username;
+  
+      }
       
-      //  lcd.print(score);
-    } else {
+      if (inputUsername == 0){
+        startGame = 0;
+        buttonPressed = false;
+        username = "AAA";
+      }
+       EEPROM.put(topScorerAddress, topScorer);
+       EEPROM.put(secondScorerAddress, secondScorer);
+       EEPROM.put(thirdScorerAddress, thirdScorer);
+       
+      /* Serial.println(topScorer);
+       Serial.println(secondScorer);
+       Serial.println(thirdScorer);
+      */
+      for (int row = 0; row < matrixSize; row++) {
+        for (int col = 0; col < matrixSize; col++) {
+          matrix[row][col] = 0;
+        }
+      }
+     
+      
+    } 
+    
+    else {
       matrixChanged = true;
       if (turnOffLed == 1) {
         matrix[xLastPos][yLastPos] = 0; //inchid ledul de la coordonatele anterioare
