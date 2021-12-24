@@ -97,6 +97,7 @@ int matrix[matrixSize][matrixSize] = {
   {0,0,0,0,0,0,0,0}
 };
 
+/*
 bool loserMatrix[matrixSize][matrixSize] = {
   {0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0},
@@ -108,7 +109,7 @@ bool loserMatrix[matrixSize][matrixSize] = {
   {0,0,0,0,0,0,0,0},
   {0,0,0,0,0,0,0,0}
 };
-
+*/
 /*
   B00000000,
   B01000100,
@@ -582,6 +583,12 @@ void detectTileCollision() {
     //Serial.println(scrollAmount);
   }
   //else, start going down
+  else if((matrix[xPos + 1][yPos] == 2 && matrix[xPos][yPos] == 1) || (matrix[xPos - 1][yPos] == 2 && matrix[xPos][yPos] == 1 )){
+    tone(buzzerPin, 120, 120);
+    if(jumping == 0){
+      xPos++;
+    }
+  }
   else {
     if (jumping == 0) {
       xPos++;
@@ -682,7 +689,7 @@ void updatePositions() {
     //game over
     if (xPos > 6) {
       tone(buzzerPin, 50, 1000);
-
+      
       xPos = 100;
       if (inputUsername == 0){
 
@@ -734,8 +741,17 @@ void updatePositions() {
           
         
         }
-      
-    
+
+         if(difficultyLevel == 1 && score >= 50){
+           lcd.clear();
+           lcd.setCursor(0,0);
+           lcd.print("You passed");
+           lcd.setCursor(0,1);
+           lcd.print("level 1!");
+           difficultyLevel = 2;
+           delay(4000);
+         }
+        
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Your score:");
@@ -817,12 +833,7 @@ void updatePositions() {
      
       
       
-      for (int row = 0; row < matrixSize; row++) {
-        for (int col = 0; col < matrixSize; col++) {
-          matrix[row][col] = loserMatrix[row][col];
       
-        }
-      }
 
       if(ranking == 1){
         topScorer = username;
