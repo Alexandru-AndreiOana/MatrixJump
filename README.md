@@ -20,13 +20,13 @@ The level played can be chosen at any time through the difficulty setting. Achie
 ### Implementation details
 The main functions used are: updatePositions(), scrollDownMatrix(), detectTileCollision(), generateTopRow(). Besides these, there are the menu function() and gameOver(), that just perform standard checks.
 
--updatePositions() : control the joystick movement, changes the dot position when jumping, changes the previous dot on and off value, checks if the game is over, checks how much scrolling/jumping occurs
+- updatePositions() : control the joystick movement, changes the dot position when jumping, changes the previous dot on and off value, checks if the game is over, checks how much scrolling/jumping occurs
 
--scrollDownMatrix() : makes every row get the value of the row above it, calls generateTopRow, fixes the random parameters (calls getRandomVariables()), decrements the x value of the dot to keep it at a constant height after scrolling
+- scrollDownMatrix() : makes every row get the value of the row above it, calls generateTopRow, fixes the random parameters (calls getRandomVariables()), decrements the x value of the dot to keep it at a constant height after scrolling
 
--detectTileCollision() : checks if the dot interacts with a higher tile, a solid tile, a trappy tile or with no tile at all, updates score and scrolling parameters accordingly
+- detectTileCollision() : checks if the dot interacts with a higher tile, a solid tile, a trappy tile or with no tile at all, updates score and scrolling parameters accordingly
 
--generateTopRow() : generates a new row using the random variables (empty row, solid tile, trappy tile, small tile, big tile, medium tile)
+- generateTopRow() : generates a new row using the random variables (empty row, solid tile, trappy tile, small tile, big tile, medium tile)
 
 
 ### Setup
